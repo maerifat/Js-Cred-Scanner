@@ -1,8 +1,9 @@
 #!/bin/bash
 #Defining Variables.
-MYPATH=/appsec/jsscanner
+MYPATH=/security/DEV/jsscanner
 ALLDOMAINSFILE=$MYPATH/alldomains.txt
-REPORTFILE=$MYPATH/dailyreport_`date +"%Y-%m-%d"`.txt
+FILENAME="$(uuidgen)_dailyreport_`date +"%Y-%m-%d"`.txt"
+REPORTFILE=$MYPATH/$FILENAME
 TEMPJSCONTENTFILE=$MYPATH/tempjscontent.txt
 ALLJSFILE=$MYPATH/alljs.txt
 BLACKLISTEDJSFILE=$MYPATH/blacklistedjs.txt
@@ -19,11 +20,16 @@ test -e  $BLACKLISTEDJSFILE|| touch $BLACKLISTEDJSFILE
 test -e $DIGESTDB || touch $DIGESTDB
 test -e $BLACKLISTEDDOMAINFILE || touch $BLACKLISTEDDOMAINFILE
 #cheking working domains
-cat  $ALLDOMAINSFILE |httpx  -silent >$TEMPWORKINGDOMAINSFILE
+cat  $ALLDOMAINSFILE |httpx   -silent >$TEMPWORKINGDOMAINSFILE
 #Gathering js files with tools
-gospider -S $TEMPWORKINGDOMAINSFILE -d 0 -a -w | egrep -i "\.js$|\.js\?"| egrep -io "http.*"| cut -d "]" -f1 |sort -u |httpx -mc 200 -silent >  $ALLJSFILE
-cat $TEMPWORKINGDOMAINSFILE|gau|egrep -i "\.js$|\.js\?"|sort -u| httpx -mc 200 -silent>> $ALLJSFILE 
-cat $TEMPWORKINGDOMAINSFILE|waybackurls|egrep -i "\.js$|\.js\?"| sort -u|httpx -mc 200 -silent  >> $ALLJSFILE
+gospider -S $TEMPWORKINGDOMAINSFILE  | egrep -i "\.js$|\.js\?"| egrep -io "http.*"| cut -d "]" -f1 | \
+sort -u |httpx  -mc 200 -silent  |tee   $ALLJSFILE
+echo "Gospider done"
+
+cat $TEMPWORKINGDOMAINSFILE|gau|egrep -i "\.js$|\.js\?"|sort -u| httpx  -mc 200 -silent| tee -a $ALLJSFILE 
+echo "Gau done"
+cat $TEMPWORKINGDOMAINSFILE|waybackurls|egrep -i "\.js$|\.js\?"| sort -u|httpx -mc 200  -silent  |tee -a $ALLJSFILE
+echo "waybackurls done"
 #Working on each js file in loop.
 for URL in $(cat $ALLJSFILE)
 do
@@ -59,9 +65,9 @@ sort -u -o $DIGESTDB $DIGESTDB
 SCANNEDJSCOUNT=$(egrep "^(\[ \+ \])" $REPORTFILE|wc -l)
 FINDINGSCOUNT=$(egrep "\s+\->\s+" $REPORTFILE|wc -l)
 #uploading report to s3 bucket
-aws s3 cp $REPORTFILE s3://appsec-js-scanner/
+aws s3 cp $REPORTFILE s3://jslambdabucket/
 #Getting presigned url of report
-REPORTURL=$(aws s3 presign s3://appsec-js-scanner$REPORTFILE --expires-in 60000)
+REPORTURL=$(aws s3 presign s3://jslambdabucket/$FILENAME --expires-in 60000)
 #Forwarding presigned-url of report to reporthandler, that will send this url to slack channel.
 python3 $REPORTHANDLERFILE $REPORTURL $SCANNEDJSCOUNT $FINDINGSCOUNT
 #cleaning
