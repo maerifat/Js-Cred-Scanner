@@ -3,7 +3,7 @@ import sys
 import random
 import requests
 if __name__ == '__main__':
-    url = "https://hooks.slack.com/services/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"
+    url = "https://hooks.slack.com/services/T02JLFT344U/B02K807C8SU/F8V9FQMXBl8E7Rxxxxxxxxx"
     reporturl =sys.argv[1]
     message = (reporturl)
     scannedjscount = sys.argv[2]
